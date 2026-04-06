@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -451,6 +450,68 @@
   }
   .empty-state .icon { font-size:40px;margin-bottom:12px; }
   .empty-state p { font-size:14px; }
+
+  /* VOTED STATE */
+  .voted-banner {
+    max-width: 600px;
+    margin: 0 auto 48px;
+    padding: 0 20px;
+    text-align: center;
+    animation: fadeInUp 0.6s ease;
+  }
+  @keyframes fadeInUp {
+    from { opacity:0; transform:translateY(24px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  .voted-box {
+    background: var(--dark2);
+    border: 1px solid var(--gold);
+    border-radius: 24px;
+    padding: 48px 36px;
+    position: relative;
+    overflow: hidden;
+  }
+  .voted-box::before {
+    content:'';
+    position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,var(--gold),var(--gold-light));
+  }
+  .voted-icon { font-size:56px; margin-bottom:16px; }
+  .voted-box h2 {
+    font-family:'Playfair Display',serif;
+    font-size:24px;color:#fff;margin-bottom:10px;
+  }
+  .voted-box p { color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:20px; }
+  .voted-date {
+    display:inline-block;
+    background:var(--dark3);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:6px 18px;
+    font-size:12px;
+    color:var(--gold);
+    letter-spacing:1px;
+  }
+  .voted-report-btn {
+    display:inline-block;
+    margin-top:20px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-light));
+    color:var(--dark);
+    border:none;
+    padding:12px 36px;
+    border-radius:25px;
+    font-family:'DM Sans',sans-serif;
+    font-size:14px;font-weight:700;
+    cursor:pointer;
+    transition:all 0.3s;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    box-shadow:0 6px 24px rgba(201,168,76,0.3);
+  }
+  .voted-report-btn:hover {
+    transform:translateY(-2px);
+    box-shadow:0 10px 32px rgba(201,168,76,0.45);
+  }
 </style>
 </head>
 <body>
@@ -655,8 +716,9 @@ async function submitSurvey() {
     });
 
     showToast('✅ Anket başarıyla gönderildi!', 'success');
+    markVoted();
     btn.textContent = '✓ Gönderildi';
-    setTimeout(() => { btn.disabled = false; btn.textContent = 'Anketi Gönder'; resetForm(); }, 3000);
+    setTimeout(() => { showVotedScreen(); }, 1800);
 
   } catch(e) {
     console.error(e);
@@ -773,14 +835,64 @@ async function loadReport() {
   }
 }
 
+// ===================== VOTED CHECK =====================
+const VOTED_KEY = 'survey_voted_v1';
+
+function hasVoted() {
+  try { return !!localStorage.getItem(VOTED_KEY); } catch(e) { return false; }
+}
+
+function markVoted() {
+  try {
+    const now = new Date();
+    const str = now.toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    localStorage.setItem(VOTED_KEY, str);
+  } catch(e) {}
+}
+
+function getVotedDate() {
+  try { return localStorage.getItem(VOTED_KEY) || ''; } catch(e) { return ''; }
+}
+
+function showVotedScreen() {
+  const container = document.querySelector('#view-survey .survey-container');
+  const submitSec = document.querySelector('#view-survey .submit-section');
+  if (container) container.style.display = 'none';
+  if (submitSec) submitSec.style.display = 'none';
+
+  const banner = document.createElement('div');
+  banner.className = 'voted-banner';
+  banner.innerHTML = `
+    <div class="voted-box">
+      <div class="voted-icon">✅</div>
+      <h2>Oyunuzu Kullandınız</h2>
+      <p>Bu ankete daha önce katıldınız.<br>Her personel yalnızca bir kez oy kullanabilir.</p>
+      <div class="voted-date">🗓 ${getVotedDate()}</div>
+      <br>
+      <button class="voted-report-btn" onclick="switchTab('report', true)">Sonuçları Görüntüle</button>
+    </div>`;
+
+  document.getElementById('view-survey').insertBefore(banner, document.getElementById('view-survey').firstChild);
+}
+
+function checkVotedOnLoad() {
+  if (hasVoted()) showVotedScreen();
+}
+
 // ===================== TABS =====================
-function switchTab(tab) {
+function switchTab(tab, fromCode) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
 
-  event.currentTarget.classList.add('active');
-  document.getElementById(`view-${tab}`).classList.add('active');
+  if (!fromCode && window.event && window.event.currentTarget) {
+    window.event.currentTarget.classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      if (b.textContent.includes('Sonuç')) b.classList.add('active');
+    });
+  }
 
+  document.getElementById(`view-${tab}`).classList.add('active');
   if (tab === 'report') loadReport();
 }
 
@@ -797,6 +909,9 @@ window.switchTab     = switchTab;
 window.submitSurvey  = submitSurvey;
 window.markAnswered  = markAnswered;
 window.loadReport    = loadReport;
+
+// On load: block re-voting
+checkVotedOnLoad();
 </script>
 
 </body>
